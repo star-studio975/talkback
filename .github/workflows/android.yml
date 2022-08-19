@@ -20,8 +20,4 @@ jobs:
         distribution: 'temurin'
 
     - name: www
-      run: gradle wrapper --gradle-version 5.4.1
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
+      run: ./build.sh
