@@ -21,7 +21,7 @@ jobs:
         cache: gradle
 
     - name: Gradle
-      run: gradle wrapper --gradle-version 7.4.2
+      run: gradle wrapper --gradle-version 5.4.1
 
     - name: Grant execute permission for gradlew
       run: chmod 777 gradlew
