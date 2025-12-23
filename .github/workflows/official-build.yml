@@ -1,7 +1,7 @@
 name: Build TalkBack via Official Partner Script
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 支持手动点击运行
 
 jobs:
   build-talkback:
@@ -11,19 +11,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 准备 Java 17 环境
+      # 1. 准备 Java 17 环境 (脚本官方推荐版本)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          # 这会自动设置环境变量 JAVA_HOME
+          cache: gradle
 
-      # 2. 修改包名
+      # 2. 修改包名 (防止与系统内置 TalkBack 冲突)
       - name: Customize Package Name
         run: |
+          # 批量替换所有 build.gradle 中的包名定义
           find . -name "build.gradle" -exec sed -i 's/com.google.android.marvin.talkback/com.mycustom.talkback/g' {} +
-          echo "包名已修改为 com.mycustom.talkback"
+          # 同时替换源码中的 R 文件引用和 manifest 引用
+          find . -name "AndroidManifest.xml" -exec sed -i 's/com.google.android.marvin.talkback/com.mycustom.talkback/g' {} +
+          echo "✅ 包名已成功修改为 com.mycustom.talkback"
 
       # 3. 运行官方 build.sh 脚本
       - name: Execute build.sh
@@ -31,13 +34,26 @@ jobs:
           # 赋予脚本执行权限
           chmod +x ./build.sh
           
-          # 手动导出脚本需要的变量
-          # 在 GitHub Runner 中，$ANDROID_HOME 是预设的 SDK 路径
+          # 注入脚本要求的环境变量
+          # $ANDROID_HOME 是 GitHub Runner 预装 SDK 的标准路径
           export ANDROID_SDK=$ANDROID_HOME
           
-          # 打印一下路径确保不为空（调试用）
+          # 打印调试信息
+          echo "🚀 开始构建..."
           echo "Using Android SDK at: $ANDROID_SDK"
           echo "Using Java Home at: $JAVA_HOME"
           
-          # 运行脚本
+          # 执行官方脚本
           ./build.sh
+
+      # 4. 收集并上传生成的 APK
+      - name: Upload TalkBack APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: TalkBack-Official-APK
+          # 根据你上次运行生成的路径进行精准抓取
+          path: |
+            build/outputs/apk/phone/debug/talkback-phone-debug.apk
+            build/outputs/apk/wear/debug/talkback-wear-debug.apk
+          if-no-files-found: error
