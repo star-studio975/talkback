@@ -1,16 +1,12 @@
 name: Build TalkBack via Official Partner Script
-
 on:
   workflow_dispatch: # 支持手动点击运行
-
 jobs:
   build-talkback:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       # 1. 准备 Java 17 环境 (脚本官方推荐版本)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -19,61 +15,27 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # 2. 深度清理：同时替换两条包名路径
-      - name: Dual-Path Package Rename
-        run: |
-          echo "开始执行双重路径全量替换..."
-
-          # 定义两个已知的 Google TalkBack 包名前缀
-          PKG1="com.google.android.marvin.talkback"
-          PKG2="com.google.android.accessibility.talkback"
-          
-          # 定义你的新包名（建议简短一点，防止某些地方长度受限）
-          MY_PKG="com.mycustom.tb"
-
-          # --- 第一步：地毯式搜索替换所有文本内容 ---
-          # 这样能覆盖到 Java, XML, Gradle, Proguard 等所有文件
-          echo "正在处理内容替换..."
-          find . -type f -is_regular -exec sed -i "s/$PKG1/$MY_PKG/g" {} +
-          find . -type f -is_regular -exec sed -i "s/$PKG2/$MY_PKG/g" {} +
-
-          # --- 第二步：针对权限声明的额外处理 ---
-          # 很多权限以 com.google.android.accessibility 开头（不带 talkback）
-          # 我们也需要把这些权限的前缀改掉，否则会有签名冲突
-          find . -type f -name "AndroidManifest.xml" -exec sed -i 's/com.google.android.accessibility/com.mycustom.accessibility/g' {} +
-
-          # --- 第三步：修正 Application 类路径 ---
-          # 这一步解决你看到的 TalkBackApplication 崩溃问题
-          # 确保 Manifest 里的 android:name 指向了你修改后的路径
-          find . -type f -name "AndroidManifest.xml" -exec sed -i "s/android:name=\".TalkBackApplication\"/android:name=\"$MY_PKG.TalkBackApplication\"/g" {} +
-
-          echo "✅ 双重路径清理完毕"
-
       # 3. 运行官方 build.sh 脚本
       - name: Execute build.sh
         run: |
           # 赋予脚本执行权限
-          chmod +x ./build.sh
-          
+          chmod +x ./build.sh          
           # 注入脚本要求的环境变量
           # $ANDROID_HOME 是 GitHub Runner 预装 SDK 的标准路径
-          export ANDROID_SDK=$ANDROID_HOME
-          
+          export ANDROID_SDK=$ANDROID_HOME          
           # 打印调试信息
           echo "🚀 开始构建..."
           echo "Using Android SDK at: $ANDROID_SDK"
-          echo "Using Java Home at: $JAVA_HOME"
-          
+          echo "Using Java Home at: $JAVA_HOME"          
           # 执行官方脚本
           ./build.sh
-
       # 4. 收集并上传生成的 APK
       - name: Upload TalkBack APK
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: TalkBack-Official-APK
-          # 根据你上次运行生成的路径进行精准抓取
+          name: TalkBack-Official-APK          
+# 根据你上次运行生成的路径进行精准抓取
           path: |
             build/outputs/apk/phone/debug/talkback-phone-debug.apk
             build/outputs/apk/wear/debug/talkback-wear-debug.apk
