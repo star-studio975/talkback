@@ -19,14 +19,35 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # 2. 修改包名 (防止与系统内置 TalkBack 冲突)
-      - name: Customize Package Name
+      # 2. 深度清理：同时替换两条包名路径
+      - name: Dual-Path Package Rename
         run: |
-          # 批量替换所有 build.gradle 中的包名定义
-          find . -name "build.gradle" -exec sed -i 's/com.google.android.marvin.talkback/com.mycustom.talkback/g' {} +
-          # 同时替换源码中的 R 文件引用和 manifest 引用
-          find . -name "AndroidManifest.xml" -exec sed -i 's/com.google.android.marvin.talkback/com.mycustom.talkback/g' {} +
-          echo "✅ 包名已成功修改为 com.mycustom.talkback"
+          echo "开始执行双重路径全量替换..."
+
+          # 定义两个已知的 Google TalkBack 包名前缀
+          PKG1="com.google.android.marvin.talkback"
+          PKG2="com.google.android.accessibility.talkback"
+          
+          # 定义你的新包名（建议简短一点，防止某些地方长度受限）
+          MY_PKG="com.mycustom.tb"
+
+          # --- 第一步：地毯式搜索替换所有文本内容 ---
+          # 这样能覆盖到 Java, XML, Gradle, Proguard 等所有文件
+          echo "正在处理内容替换..."
+          find . -type f -is_regular -exec sed -i "s/$PKG1/$MY_PKG/g" {} +
+          find . -type f -is_regular -exec sed -i "s/$PKG2/$MY_PKG/g" {} +
+
+          # --- 第二步：针对权限声明的额外处理 ---
+          # 很多权限以 com.google.android.accessibility 开头（不带 talkback）
+          # 我们也需要把这些权限的前缀改掉，否则会有签名冲突
+          find . -type f -name "AndroidManifest.xml" -exec sed -i 's/com.google.android.accessibility/com.mycustom.accessibility/g' {} +
+
+          # --- 第三步：修正 Application 类路径 ---
+          # 这一步解决你看到的 TalkBackApplication 崩溃问题
+          # 确保 Manifest 里的 android:name 指向了你修改后的路径
+          find . -type f -name "AndroidManifest.xml" -exec sed -i "s/android:name=\".TalkBackApplication\"/android:name=\"$MY_PKG.TalkBackApplication\"/g" {} +
+
+          echo "✅ 双重路径清理完毕"
 
       # 3. 运行官方 build.sh 脚本
       - name: Execute build.sh
