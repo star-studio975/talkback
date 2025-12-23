@@ -1,0 +1,49 @@
+name: Build TalkBack via Official Partner Script
+
+on:
+  workflow_dispatch: # 支持在 GitHub 页面手动点击运行
+
+jobs:
+  build-talkback:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. 准备 Java 17 环境 (脚本注释中推荐的版本)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 2. 修改包名 (防止与手机自带的 TalkBack 冲突导致无法安装)
+      - name: Customize Package Name
+        run: |
+          # 扫描所有 build.gradle 文件，将 Google 官方包名替换为自定义包名
+          find . -name "build.gradle" -exec sed -i 's/com.google.android.marvin.talkback/com.mycustom.talkback/g' {} +
+          echo "包名已修改为 com.mycustom.talkback"
+
+      # 3. 运行官方 build.sh 脚本
+      - name: Execute build.sh
+        env:
+          # 这里的变量是 build.sh 脚本运行所必须的
+          ANDROID_SDK: ${{ env.ANDROID_HOME }}
+          JAVA_HOME: /usr/lib/jvm/temurin-17-amd64
+        run: |
+          # 赋予脚本执行权限
+          chmod +x ./build.sh
+          
+          # 运行脚本
+          # 注意：脚本内部会使用 sudo unzip 将 Gradle 解压到 /opt，GitHub Runner 支持 sudo
+          ./build.sh
+
+      # 4. 收集并上传生成的 APK
+      - name: Upload TalkBack APK
+        uses: actions/upload-artifact@v4
+        if: success() # 只有编译成功才上传
+        with:
+          name: TalkBack-Partner-Build
+          # 脚本运行后的 APK 通常在 talkback/build/outputs/apk/ 目录下
+          path: "**/build/outputs/apk/**/*.apk"
